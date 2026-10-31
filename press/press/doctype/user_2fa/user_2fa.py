@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import random
+import secrets
 import string
 
 import frappe
@@ -64,10 +64,10 @@ class User2FA(Document):
 		digits = string.digits
 		all_chars = letters + digits
 		# ensure at least one letter and one non-letter
-		result = [random.choice(letters), random.choice(digits)]
+		result = [secrets.choice(letters), secrets.choice(digits)]
 		# fill the rest randomly
-		result += [random.choice(all_chars) for _ in range(length - 2)]
-		random.shuffle(result)
+		result += [secrets.choice(all_chars) for _ in range(length - 2)]
+		secrets.SystemRandom().shuffle(result)
 		return "".join(result).upper()
 
 	@classmethod
