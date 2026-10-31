@@ -216,3 +216,70 @@ def get_active_build_count_by_build_server():
 		pluck="build_server",
 	)
 	return Counter(build_servers)
+
+
+def get_ephemeral_build_settings() -> tuple[bool, str | None]:
+	enabled = frappe.db.get_single_value("Press Settings", "enable_ephemeral_builders")
+	cluster = frappe.db.get_single_value("Press Settings", "ephemeral_build_cluster")
+	return bool(enabled), cluster
+
+
+def ensure_ephemeral_build_server(platform: str, team: str | None = None) -> bool:
+	"""Rent a build server on the ephemeral cluster unless one is already up.
+
+	Returns True when a machine exists or provisioning has started, False when
+	the feature is off or the cluster setup is broken (the caller then fails
+	loudly, as it would without the feature).
+	"""
+	enabled, cluster = get_ephemeral_build_settings()
+	if not enabled or not cluster:
+		return False
+
+	if frappe.db.exists(
+		"Server",
+		{
+			"is_ephemeral_build_server": 1,
+			"cluster": cluster,
+			"status": ("in", ("Draft", "Pending", "Active")),
+		},
+	):
+		return True
+
+	from press.press.doctype.cluster.cluster import Cluster  # avoided at module level: circular import
+
+	try:
+		server, _job = Cluster(cluster).create_server(
+			doctype="Server",
+			title="Ephemeral Build",
+			team=team,
+			create_subscription=False,
+		)
+	except Exception:
+		from press.utils import log_error
+
+		log_error(title="Ephemeral Build Server Provisioning Failed")
+		return False
+
+	frappe.db.set_value("Server", server.name, {"is_ephemeral_build_server": 1, "use_for_build": 1})
+	return True
+
+
+def release_ephemeral_build_server(server: str):
+	"""Archive an ephemeral build server once it has no active builds left."""
+	if not frappe.db.get_value("Server", server, "is_ephemeral_build_server"):
+		return
+
+	if get_active_build_count_by_build_server().get(server, 0):
+		return
+
+	if frappe.db.exists(
+		"Press Job",
+		{"job_type": "Archive Server", "server": server, "status": ("in", ("Pending", "Running"))},
+	):
+		return
+
+	frappe.db.set_value("Server", server, "use_for_build", 0)
+
+	from press.press.doctype.server.server import Server  # avoided at module level: circular import
+
+	Server(server)._archive(reason="Ephemeral build server released")

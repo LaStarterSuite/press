@@ -101,6 +101,7 @@
 		"use_for_new_sites",
 		"staging",
 		"use_for_build",
+		"is_ephemeral_build_server",
 		"platform",
 		"column_break_ktkv",
 		"exclude_for_scheduling",
@@ -588,6 +589,14 @@
 			"fieldname": "use_for_build",
 			"fieldtype": "Check",
 			"label": "Use For Build",
+			"search_index": 1
+		},
+		{
+			"default": "0",
+			"description": "Set by press for rented machines that only run builds; such servers are archived automatically once their builds finish.",
+			"fieldname": "is_ephemeral_build_server",
+			"fieldtype": "Check",
+			"label": "Is Ephemeral Build Server",
 			"search_index": 1
 		},
 		{

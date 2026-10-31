@@ -23,8 +23,8 @@ import requests
 import semantic_version
 from frappe.core.utils import find
 from frappe.model.document import Document
+from frappe.utils import add_to_date, rounded, sbool
 from frappe.utils import now_datetime as now
-from frappe.utils import rounded, sbool
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from press.agent import Agent
@@ -42,10 +42,12 @@ from press.press.doctype.deploy_candidate.docker_output_parsers import (
 	ValidationOutputParser,
 )
 from press.press.doctype.deploy_candidate.utils import (
+	ensure_ephemeral_build_server,
 	get_arm_build_server_with_least_active_builds,
 	get_build_server,
 	get_intel_build_server_with_least_active_builds,
 	is_suspended,
+	release_ephemeral_build_server,
 )
 from press.utils import get_current_team, log_error
 from press.utils.environment_variable import validate_environment_variable
@@ -288,6 +290,9 @@ class DeployCandidateBuild(Document):
 			setattr(self, timestamp_field, now())
 
 		self.save(ignore_version=True)
+
+		if self.status in (Status.SUCCESS.value, Status.FAILURE.value) and self.build_server:
+			release_ephemeral_build_server(self.build_server)
 
 		if commit:
 			frappe.db.commit()
@@ -1002,6 +1007,10 @@ class DeployCandidateBuild(Document):
 			del kwargs["no_cache"]
 
 		self.set_build_server()
+
+		if not self.build_server and not self.no_build and self._try_ephemeral_build_server():
+			return
+
 		self.set_status(Status.PENDING, timestamp_field="pending_start")
 
 		self.save()
@@ -1023,6 +1032,19 @@ class DeployCandidateBuild(Document):
 		frappe.set_user(user)
 		frappe.session.data = session_data
 		frappe.db.commit()
+
+	def _try_ephemeral_build_server(self) -> bool:
+		"""Provision an ephemeral build server and reschedule this build instead of failing.
+
+		The scheduler re-runs Scheduled builds every minute, so the build retries
+		until the rented server is Active and the normal selection picks it.
+		"""
+		if not ensure_ephemeral_build_server(self.platform or "x86_64", self.get_team_for_build()):
+			return False
+
+		self.scheduled_time = add_to_date(now(), minutes=2)
+		self.set_status(Status.SCHEDULED, commit=True)
+		return True
 
 	def on_update(self):
 		if self.status == "Running":
