@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import random
-
 import frappe
 import frappe.utils
 from frappe.rate_limiter import rate_limit
@@ -12,6 +10,7 @@ from frappe.rate_limiter import rate_limit
 from press.api.account import get_account_request_from_key
 from press.press.doctype.team.team import Team
 from press.saas.doctype.product_trial.product_trial import ProductTrial, send_verification_mail_for_login
+from press.utils.otp import generate_otp
 from press.utils.telemetry import capture
 
 
@@ -40,6 +39,7 @@ def _get_active_site(product: str, team: str | None) -> str | None:
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=5, seconds=600)
 def send_verification_code_for_login(email: str, product: str):
 	is_user_exists = frappe.db.exists("Team", {"user": email}) and _get_active_site(
 		product, frappe.db.get_value("Team", {"user": email}, "name")
@@ -47,7 +47,7 @@ def send_verification_code_for_login(email: str, product: str):
 	if not is_user_exists:
 		frappe.throw("You have no active sites for this product. Please try signing up.")
 	# generate otp and store in redis
-	otp = str(random.randint(100000, 999999))
+	otp = str(generate_otp())
 	frappe.cache.set_value(
 		f"product_trial_login_verification_code:{email}",
 		frappe.utils.sha256_hash(otp),
