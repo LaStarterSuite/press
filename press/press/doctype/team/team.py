@@ -918,6 +918,7 @@ class Team(Document):
 		try:
 			frappeio_client = get_frappe_io_connection()
 		except FrappeioServerNotSet:
+			log_error("Frappe.io not configured; skipped billing details sync on Team", team=self.name)
 			return
 
 		previous_version = self.get_doc_before_save()
