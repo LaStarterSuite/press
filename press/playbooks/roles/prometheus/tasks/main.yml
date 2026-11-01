@@ -120,4 +120,4 @@
   become_user: frappe
   cron:
     name: agent discovery
-    job: cd /home/frappe/agent && /home/frappe/agent/env/bin/agent discover
+    job: "cd /home/frappe/agent && /home/frappe/agent/env/bin/agent discover > /dev/null 2>&1"
