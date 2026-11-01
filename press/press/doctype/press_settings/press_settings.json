@@ -107,6 +107,8 @@
 		"clone_directory",
 		"build_directory",
 		"build_server",
+		"enable_ephemeral_builders",
+		"ephemeral_build_cluster",
 		"minimum_rebuild_memory",
 		"new_bench_concurrency_limit",
 		"column_break_66",
@@ -1331,6 +1333,22 @@
 			"fieldtype": "Link",
 			"label": "Build Server",
 			"options": "Server"
+		},
+		{
+			"default": "0",
+			"description": "When no regular build server has capacity, provision a temporary server on the cluster below, build on it, and archive it after the build.",
+			"fieldname": "enable_ephemeral_builders",
+			"fieldtype": "Check",
+			"label": "Enable Ephemeral Build Servers"
+		},
+		{
+			"depends_on": "enable_ephemeral_builders",
+			"description": "Cluster used to rent temporary build machines",
+			"fieldname": "ephemeral_build_cluster",
+			"fieldtype": "Link",
+			"label": "Ephemeral Build Cluster",
+			"mandatory_depends_on": "enable_ephemeral_builders",
+			"options": "Cluster"
 		},
 		{
 			"default": "10",
