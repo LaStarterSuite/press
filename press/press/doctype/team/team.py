@@ -917,10 +917,8 @@ class Team(Document):
 
 		try:
 			frappeio_client = get_frappe_io_connection()
-		except FrappeioServerNotSet as e:
-			if frappe.conf.developer_mode or os.environ.get("CI"):
-				return
-			raise e
+		except FrappeioServerNotSet:
+			return
 
 		previous_version = self.get_doc_before_save()
 
